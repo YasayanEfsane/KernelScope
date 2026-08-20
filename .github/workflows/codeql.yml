@@ -1,0 +1,30 @@
+name: codeql
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '17 4 * * 1'
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze-cpp:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: microsoft/setup-msbuild@v2
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: c-cpp
+          build-mode: manual
+      - name: Build user-mode analysis targets
+        run: |
+          msbuild collector\KernelScopeCollector.vcxproj /m /p:Configuration=Release /p:Platform=x64
+          msbuild tests\KernelScopeTests.vcxproj /m /p:Configuration=Release /p:Platform=x64
+      - uses: github/codeql-action/analyze@v3
+
+# The hosted workflow intentionally does not claim to build the WDK project.
+

@@ -1,0 +1,47 @@
+[Version]
+Signature="$WINDOWS NT$"
+Class=System
+ClassGuid={4d36e97d-e325-11ce-bfc1-08002be10318}
+Provider=%ProviderName%
+DriverVer=08/20/2026,1.0.0.0
+CatalogFile=KernelScopeDriver.cat
+PnpLockdown=1
+
+[DestinationDirs]
+DefaultDestDir = 12
+DriverCopyFiles = 12
+
+[DefaultInstall.NTamd64]
+CopyFiles=DriverCopyFiles
+
+[DefaultInstall.NTamd64.Services]
+AddService=KernelScopeDriver,0x00000002,ServiceInstall
+
+[DefaultInstall.NTamd64.Wdf]
+KmdfService=KernelScopeDriver,KernelScopeDriver.Wdf
+
+[KernelScopeDriver.Wdf]
+KmdfLibraryVersion=1.15
+
+[DriverCopyFiles]
+KernelScopeDriver.sys
+
+[ServiceInstall]
+DisplayName=%ServiceName%
+Description=%ServiceDescription%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%12%\KernelScopeDriver.sys
+
+[SourceDisksFiles]
+KernelScopeDriver.sys=1
+
+[SourceDisksNames]
+1=%DiskName%,,,
+
+[Strings]
+ProviderName="KernelScope Project"
+ServiceName="KernelScope Defensive Telemetry Driver"
+ServiceDescription="Documented-API kernel telemetry for authorized defensive research"
+DiskName="KernelScope Driver Installation Media"

@@ -1,0 +1,44 @@
+name: Bug report
+description: Report a reproducible defensive KernelScope defect
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include secrets, private keys, proprietary drivers, or sensitive dumps.
+  - type: input
+    id: commit
+    attributes: { label: Commit, description: Exact commit or tag }
+    validations: { required: true }
+  - type: input
+    id: environment
+    attributes: { label: Environment, description: Windows, VS, SDK, WDK, HVCI status }
+    validations: { required: true }
+  - type: textarea
+    id: reproduction
+    attributes: { label: Reproduction, description: Minimal isolated-VM steps }
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes: { label: Expected behavior }
+    validations: { required: true }
+  - type: textarea
+    id: observed
+    attributes: { label: Observed behavior }
+    validations: { required: true }
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics
+      description: Include minimal errors, exit codes, or stack information without secrets or sensitive dumps.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I reproduced this only in an authorized isolated environment.
+          required: true
+        - label: This report contains no credentials, keys, proprietary binaries, malware, or sensitive dumps.
+          required: true
+        - label: This is not an undisclosed vulnerability; security issues use private reporting.
+          required: true

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64"><Configuration>Debug</Configuration><Platform>x64</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals"><ProjectGuid>{CE8E9DE8-6D50-481F-A38E-59C90D98C4D5}</ProjectGuid><Keyword>Win32Proj</Keyword><RootNamespace>KernelScopeCollector</RootNamespace></PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration"><ConfigurationType>Application</ConfigurationType><UseDebugLibraries>true</UseDebugLibraries><CharacterSet>Unicode</CharacterSet></PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration"><ConfigurationType>Application</ConfigurationType><UseDebugLibraries>false</UseDebugLibraries><WholeProgramOptimization>true</WholeProgramOptimization><CharacterSet>Unicode</CharacterSet></PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ItemDefinitionGroup>
+    <ClCompile><LanguageStandard>stdcpp17</LanguageStandard><ConformanceMode>true</ConformanceMode><TreatWarningAsError>true</TreatWarningAsError><WarningLevel>Level4</WarningLevel><SDLCheck>true</SDLCheck><SpectreMitigation>true</SpectreMitigation><AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\shared;$(ProjectDir)..\analyzer;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories></ClCompile>
+    <Link><SubSystem>Console</SubSystem><AdditionalDependencies>bcrypt.lib;wintrust.lib;crypt32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp" /><ClCompile Include="DeviceClient.cpp" /><ClCompile Include="EventProcessor.cpp" /><ClCompile Include="JsonWriter.cpp" />
+    <ClCompile Include="..\analyzer\Findings.cpp" /><ClCompile Include="..\analyzer\Hashing.cpp" /><ClCompile Include="..\analyzer\PeParser.cpp" /><ClCompile Include="..\analyzer\SignatureVerifier.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="DeviceClient.h" /><ClInclude Include="EventProcessor.h" /><ClInclude Include="JsonWriter.h" />
+    <ClInclude Include="..\analyzer\Findings.h" /><ClInclude Include="..\analyzer\Hashing.h" /><ClInclude Include="..\analyzer\PeParser.h" /><ClInclude Include="..\analyzer\SignatureVerifier.h" /><ClInclude Include="..\shared\Protocol.h" /><ClInclude Include="..\shared\ProtocolValidation.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>
+

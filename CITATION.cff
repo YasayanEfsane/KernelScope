@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: >-
+  If you use KernelScope in authorized research, education, or a publication,
+  please cite the software using this metadata.
+title: KernelScope
+type: software
+authors:
+  - family-names: Hitay
+    given-names: Ahmet Yusuf
+license: MIT
+abstract: >-
+  KernelScope is a defensive Windows kernel telemetry and driver integrity
+  platform combining a KMDF control driver, a C++ collector, a bounds-checked
+  PE/COFF analyzer, SHA-256 hashing, Authenticode verification, structured JSON
+  reporting, and automated tests.
+keywords:
+  - Windows
+  - KMDF
+  - kernel telemetry
+  - driver integrity
+  - PE/COFF
+  - defensive security

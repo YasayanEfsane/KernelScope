@@ -1,0 +1,57 @@
+name: Defensive feature request
+description: Propose a documented-API defensive capability
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        KernelScope accepts defensive, documented-API proposals only. Requests
+        involving hooks, patches, bypasses, hiding, stealth, persistence,
+        credentials, arbitrary memory access, anti-cheat bypass, or EDR evasion
+        will be closed.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Defensive problem
+      description: What authorized defensive research or engineering problem should be solved?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe inputs, outputs, trust boundaries, and expected user experience.
+    validations:
+      required: true
+  - type: textarea
+    id: api
+    attributes:
+      label: Documented Windows APIs
+      description: Identify the supported Microsoft APIs or formats the proposal would use.
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security and compatibility impact
+      description: Address kernel work, IRQL, allocation, ABI, access control, HVCI, and failure modes.
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: Test strategy
+      description: Describe offline regression tests and any optional isolated-VM coverage.
+    validations:
+      required: true
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope confirmation
+      options:
+        - label: This proposal is strictly defensive and uses documented APIs only.
+          required: true
+        - label: This proposal requires no hook, patch, bypass, hiding, stealth, persistence, credential access, or arbitrary memory access.
+          required: true
+

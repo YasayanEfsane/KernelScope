@@ -1,0 +1,47 @@
+name: Build or usage question
+description: Ask a non-security question after reading the documentation
+title: "[Question]: "
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Do not include credentials, signing keys, sensitive dumps, proprietary
+        drivers, or vulnerability details. Security issues must use private reporting.
+  - type: input
+    id: commit
+    attributes:
+      label: Commit or source archive hash
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Windows build, Visual Studio, SDK, WDK, and HVCI state
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: State the exact build, usage, protocol, or analysis question.
+    validations:
+      required: true
+  - type: textarea
+    id: attempted
+    attributes:
+      label: What you already tried
+      description: Include sanitized commands, exit codes, and minimal relevant output.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I read README.md, SUPPORT.md, and the relevant file under docs/.
+          required: true
+        - label: I am testing only in an authorized isolated environment.
+          required: true
+
