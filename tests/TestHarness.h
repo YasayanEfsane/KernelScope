@@ -39,6 +39,17 @@ public:
     throw std::runtime_error(message.str());
 }
 
+inline void Require(
+    const bool condition,
+    const char* expression,
+    const char* file,
+    const int line)
+{
+    if (!condition) {
+        Fail(expression, file, line);
+    }
+}
+
 }  // namespace kernelscope::tests
 
 #define KS_TEST_JOIN_INNER(A, B) A##B
@@ -50,5 +61,6 @@ public:
     static void KS_TEST_JOIN(KsTestFunction_, __LINE__)()
 
 #define KS_REQUIRE(Expression) \
-    do { if (!(Expression)) ::kernelscope::tests::Fail(#Expression, __FILE__, __LINE__); } while (false)
+    ::kernelscope::tests::Require( \
+        static_cast<bool>(Expression), #Expression, __FILE__, __LINE__)
 
