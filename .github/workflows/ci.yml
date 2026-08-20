@@ -20,11 +20,20 @@ jobs:
       - name: Run offline tests
         shell: pwsh
         run: |
-          & .\tests\x64\Release\KernelScopeTests.exe *>&1 | Tee-Object -FilePath offline-tests.log
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $testBinary = Join-Path $env:GITHUB_WORKSPACE "tests\x64\Release\KernelScopeTests.exe"
+          $logPath = Join-Path $env:GITHUB_WORKSPACE "offline-tests.log"
+
+          if (-not (Test-Path -LiteralPath $testBinary)) {
+            "Test executable not found: $testBinary" | Set-Content -LiteralPath $logPath
+            throw "Offline test executable was not produced."
+          }
+
+          & $testBinary *>&1 | Tee-Object -FilePath $logPath
+          $testExitCode = $LASTEXITCODE
+          if ($testExitCode -ne 0) { exit $testExitCode }
       - name: Upload user-mode test log
-        if: always()
-        uses: actions/upload-artifact@v4
+        if: ${{ always() && hashFiles('offline-tests.log') != '' }}
+        uses: actions/upload-artifact@v6
         with:
           name: offline-test-log
           path: offline-tests.log
