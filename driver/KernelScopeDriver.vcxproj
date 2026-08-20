@@ -38,7 +38,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\shared;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatWarningAsError>true</TreatWarningAsError>
       <WarningLevel>Level4</WarningLevel>
-      <SpectreMitigation>true</SpectreMitigation>
+      <SpectreMitigation>Spectre</SpectreMitigation>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_KERNEL_MODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>

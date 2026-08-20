@@ -10,7 +10,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration"><ConfigurationType>Application</ConfigurationType><UseDebugLibraries>false</UseDebugLibraries><WholeProgramOptimization>true</WholeProgramOptimization><CharacterSet>Unicode</CharacterSet></PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemDefinitionGroup>
-    <ClCompile><LanguageStandard>stdcpp17</LanguageStandard><ConformanceMode>true</ConformanceMode><TreatWarningAsError>true</TreatWarningAsError><WarningLevel>Level4</WarningLevel><SDLCheck>true</SDLCheck><SpectreMitigation>true</SpectreMitigation><AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\shared;$(ProjectDir)..\analyzer;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories></ClCompile>
+    <ClCompile><LanguageStandard>stdcpp17</LanguageStandard><ConformanceMode>true</ConformanceMode><TreatWarningAsError>true</TreatWarningAsError><WarningLevel>Level4</WarningLevel><SDLCheck>true</SDLCheck><SpectreMitigation>Spectre</SpectreMitigation><AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\shared;$(ProjectDir)..\analyzer;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories></ClCompile>
     <Link><SubSystem>Console</SubSystem><AdditionalDependencies>bcrypt.lib;wintrust.lib;crypt32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
   </ItemDefinitionGroup>
   <ItemGroup>
