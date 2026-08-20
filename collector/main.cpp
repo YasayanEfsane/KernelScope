@@ -13,7 +13,6 @@
 #include <Windows.h>
 
 #include <atomic>
-#include <charconv>
 #include <cstdint>
 #include <filesystem>
 #include <iostream>
@@ -61,9 +60,24 @@ void PrintUsage()
 
 bool ParseUnsigned(const std::wstring& text, std::uint64_t& value)
 {
-    const std::string narrow(text.begin(), text.end());
-    const auto result = std::from_chars(narrow.data(), narrow.data() + narrow.size(), value);
-    return result.ec == std::errc{} && result.ptr == narrow.data() + narrow.size();
+    if (text.empty()) {
+        return false;
+    }
+
+    std::uint64_t parsed = 0u;
+    for (const wchar_t character : text) {
+        if (character < L'0' || character > L'9') {
+            return false;
+        }
+        const auto digit = static_cast<std::uint64_t>(character - L'0');
+        if (parsed > (std::numeric_limits<std::uint64_t>::max() - digit) / 10u) {
+            return false;
+        }
+        parsed = parsed * 10u + digit;
+    }
+
+    value = parsed;
+    return true;
 }
 
 bool OpenAndNegotiate(
