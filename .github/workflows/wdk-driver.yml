@@ -31,13 +31,17 @@ env:
 
 jobs:
   build-and-validate:
-    runs-on: windows-2025
+    runs-on: windows-2022
     timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: microsoft/setup-msbuild@v2
+      - name: Select Visual Studio 2022 MSBuild
+        uses: microsoft/setup-msbuild@v3
+        with:
+          vs-version: '[17.0,18.0)'
+          msbuild-architecture: x64
 
       - name: Prepare validation evidence
         shell: pwsh
@@ -47,43 +51,50 @@ jobs:
           New-Item -ItemType Directory -Path $evidenceRoot -Force | Out-Null
 
           $os = Get-CimInstance Win32_OperatingSystem
+          $msbuildPath = (Get-Command msbuild -ErrorAction Stop).Source
+          $msbuildVersion = (& $msbuildPath -version -nologo |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -Last 1).Trim()
           @(
             "SourceSha=$env:SOURCE_SHA"
             "RunnerImage=$env:ImageOS"
             "RunnerImageVersion=$env:ImageVersion"
             "OSCaption=$($os.Caption)"
             "OSVersion=$($os.Version)"
+            "MSBuildPath=$msbuildPath"
+            "MSBuildVersion=$msbuildVersion"
             "WDKNuGetVersion=$env:WDK_NUGET_VERSION"
           ) | Set-Content -LiteralPath (Join-Path $evidenceRoot 'environment.txt') -Encoding utf8NoBOM
 
-      - name: Ensure Visual Studio WDK component
+      - name: Ensure Visual Studio 2022 WDK component
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $evidenceRoot = Join-Path $env:GITHUB_WORKSPACE 'artifacts\wdk-evidence'
           $componentLog = Join-Path $evidenceRoot 'visual-studio-wdk-component.txt'
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $visualStudioRange = '[17.0,18.0)'
 
           if (-not (Test-Path -LiteralPath $vswhere)) {
             throw "vswhere.exe was not found at $vswhere"
           }
 
-          $installationPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1
+          $installationPath = & $vswhere -latest -version $visualStudioRange -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1
           if ([string]::IsNullOrWhiteSpace($installationPath)) {
-            throw 'No Visual Studio installation with the x64 C++ toolset was found.'
+            throw 'No Visual Studio 2022 installation with the x64 C++ toolset was found.'
           }
 
           $installationPath = $installationPath.Trim()
           "VisualStudioPath=$installationPath" | Set-Content -LiteralPath $componentLog
 
-          $wdkInstallation = & $vswhere -latest -products * -requires Microsoft.Windows.DriverKit -property installationPath | Select-Object -First 1
+          $wdkInstallation = & $vswhere -latest -version $visualStudioRange -products * -requires Microsoft.Windows.DriverKit -property installationPath | Select-Object -First 1
           if ([string]::IsNullOrWhiteSpace($wdkInstallation)) {
             $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe"
             if (-not (Test-Path -LiteralPath $installer)) {
               throw "Visual Studio Installer was not found at $installer"
             }
 
-            'Microsoft.Windows.DriverKit is not present; installing it.' | Add-Content -LiteralPath $componentLog
+            'Microsoft.Windows.DriverKit is not present in Visual Studio 2022; installing it.' | Add-Content -LiteralPath $componentLog
             $arguments = @(
               'modify'
               '--installPath'
@@ -111,15 +122,19 @@ jobs:
             }
           }
           else {
-            'Microsoft.Windows.DriverKit is already present.' | Add-Content -LiteralPath $componentLog
+            'Microsoft.Windows.DriverKit is already present in Visual Studio 2022.' | Add-Content -LiteralPath $componentLog
           }
 
-          $verifiedPath = & $vswhere -latest -products * -requires Microsoft.Windows.DriverKit -property installationPath | Select-Object -First 1
+          $verifiedPath = & $vswhere -latest -version $visualStudioRange -products * -requires Microsoft.Windows.DriverKit -property installationPath | Select-Object -First 1
           if ([string]::IsNullOrWhiteSpace($verifiedPath)) {
-            throw 'Microsoft.Windows.DriverKit was not detected after installation.'
+            throw 'Microsoft.Windows.DriverKit was not detected in Visual Studio 2022 after installation.'
           }
 
-          $installationVersion = & $vswhere -latest -products * -requires Microsoft.Windows.DriverKit -property installationVersion | Select-Object -First 1
+          $installationVersion = & $vswhere -latest -version $visualStudioRange -products * -requires Microsoft.Windows.DriverKit -property installationVersion | Select-Object -First 1
+          if ([string]::IsNullOrWhiteSpace($installationVersion) -or $installationVersion.Trim() -notmatch '^17\.') {
+            throw "Expected Visual Studio 2022 (17.x); observed version: $installationVersion"
+          }
+
           "VerifiedVisualStudioPath=$($verifiedPath.Trim())" | Add-Content -LiteralPath $componentLog
           "VisualStudioVersion=$($installationVersion.Trim())" | Add-Content -LiteralPath $componentLog
 
