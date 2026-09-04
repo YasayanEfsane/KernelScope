@@ -1,0 +1,17 @@
+<Project>
+  <!--
+    Keep installed-WDK developer builds unchanged. The pinned NuGet toolchain is
+    activated explicitly by CI with /p:UsePinnedWdkNuGet=true.
+  -->
+  <Import Project="$(MSBuildThisFileDirectory)..\Directory.Build.props" />
+
+  <Import
+    Project="$(MSBuildThisFileDirectory)..\packages\Microsoft.Windows.WDK.x64.10.0.26100.6584\build\native\Microsoft.Windows.WDK.x64.props"
+    Condition="'$(UsePinnedWdkNuGet)' == 'true' And '$(Platform)' == 'x64' And Exists('$(MSBuildThisFileDirectory)..\packages\Microsoft.Windows.WDK.x64.10.0.26100.6584\build\native\Microsoft.Windows.WDK.x64.props')" />
+  <Import
+    Project="$(MSBuildThisFileDirectory)..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.6584\build\native\Microsoft.Windows.SDK.cpp.x64.props"
+    Condition="'$(UsePinnedWdkNuGet)' == 'true' And '$(Platform)' == 'x64' And Exists('$(MSBuildThisFileDirectory)..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.6584\build\native\Microsoft.Windows.SDK.cpp.x64.props')" />
+  <Import
+    Project="$(MSBuildThisFileDirectory)..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.6584\build\native\Microsoft.Windows.SDK.cpp.props"
+    Condition="'$(UsePinnedWdkNuGet)' == 'true' And Exists('$(MSBuildThisFileDirectory)..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.6584\build\native\Microsoft.Windows.SDK.cpp.props')" />
+</Project>
