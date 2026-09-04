@@ -30,6 +30,7 @@
 Debug/
 Release/
 x64/
+packages/
 artifacts/
 TestResults/
 events*.jsonl

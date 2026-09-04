@@ -9,6 +9,9 @@
 [![Languages](https://img.shields.io/badge/languages-C%20%7C%20C%2B%2B17-00599C)](#repository-layout)
 [![Security](https://img.shields.io/badge/scope-defensive%20only-0A7D32)](#security-boundary)
 [![License](https://img.shields.io/badge/license-MIT-F2C811)](LICENSE)
+[![User-mode CI](https://github.com/YasayanEfsane/KernelScope/actions/workflows/ci.yml/badge.svg)](https://github.com/YasayanEfsane/KernelScope/actions/workflows/ci.yml)
+[![WDK Driver CI](https://github.com/YasayanEfsane/KernelScope/actions/workflows/wdk-driver.yml/badge.svg)](https://github.com/YasayanEfsane/KernelScope/actions/workflows/wdk-driver.yml)
+[![CodeQL](https://github.com/YasayanEfsane/KernelScope/actions/workflows/codeql.yml/badge.svg)](https://github.com/YasayanEfsane/KernelScope/actions/workflows/codeql.yml)
 
 KernelScope is a portfolio-grade, educational Windows security project that
 collects bounded kernel telemetry, transports it through a hardened protocol,
@@ -83,12 +86,13 @@ The project is built around four principles:
 | Integrity checks | Implemented | SHA-256 through CNG and Authenticode through WinTrust |
 | Offline tests | Implemented | Protocol, parser, hashing, JSON, and sequence tracking |
 | VM integration suite | Implemented | Optional negative protocol and driver lifecycle checks |
-| Hosted CI | Implemented | User-mode build/tests and CodeQL; no hosted driver loading |
+| Hosted CI | Implemented | User-mode tests, CodeQL, pinned WDK builds, Universal INF verification |
 | Production support | Not claimed | Independent review, signing, and Windows validation are still required |
 
 The exact validation performed for this source delivery is recorded in
-[`docs/VALIDATION.md`](docs/VALIDATION.md). A hosted CI pass does not prove that
-the WDK project built or that kernel runtime testing succeeded.
+[`docs/VALIDATION.md`](docs/VALIDATION.md). A successful WDK workflow proves
+that the driver project compiled and its stamped INF passed `InfVerif /u` with
+the pinned toolchain. It does not prove driver loading or kernel runtime safety.
 
 ## Capabilities
 
@@ -224,9 +228,9 @@ or architecture-dependent enums.
 ## Requirements
 
 - Windows 10 or Windows 11 x64 in an isolated test VM.
-- Visual Studio 2022 or newer.
+- Visual Studio 2022 (17.x) for parity with the pinned WDK 26100 toolchain.
 - **Desktop development with C++** workload.
-- A mutually compatible Windows SDK and WDK.
+- Windows SDK and WDK 10.0.26100.6584, or another documented compatible pair.
 - Administrator access inside the VM.
 - A snapshot and tested recovery path before driver installation.
 
@@ -284,8 +288,10 @@ msbuild .\driver\KernelScopeDriver.vcxproj /m `
   /p:Configuration=Debug /p:Platform=x64
 ```
 
-The hosted GitHub workflow builds and tests user-mode targets only. Hosted
-runners never install, start, test, or upload the kernel driver.
+Hosted GitHub workflows build and test the user-mode targets and compile the
+KMDF driver in Debug and Release with the pinned Microsoft WDK/SDK packages.
+They validate the stamped Release INF and unsigned output, but never install,
+start, sign, or upload the driver binary.
 
 ## Driver signing and installation
 
@@ -485,9 +491,11 @@ in [`docs/TESTING.md`](docs/TESTING.md).
 
 ### Continuous integration
 
-- `ci.yml` builds the collector and offline tests on a Windows runner.
-- Offline tests run without installing a driver.
-- Only the user-mode test log is uploaded.
+- `ci.yml` builds the collector and runs offline tests on Windows.
+- `wdk-driver.yml` pins VS2022, WDK/SDK 10.0.26100.6584, and builds the
+  Universal KMDF driver in Debug and Release.
+- The WDK job runs `InfVerif /u`, verifies the Release image is unsigned, and
+  uploads text evidence only.
 - `codeql.yml` analyzes C and C++ user-mode build targets.
 - No hosted workflow loads the driver or handles signing secrets.
 
@@ -497,6 +505,7 @@ in [`docs/TESTING.md`](docs/TESTING.md).
 KernelScope/
 ├── KernelScope.sln
 ├── Directory.Build.props
+├── packages.config
 ├── README.md
 ├── LICENSE
 ├── SECURITY.md
@@ -518,7 +527,8 @@ KernelScope/
 │   ├── Driver.h
 │   ├── Trace.h
 │   ├── KernelScopeDriver.inf
-│   └── KernelScopeDriver.vcxproj
+│   ├── KernelScopeDriver.vcxproj
+│   └── Directory.Build.props
 ├── collector/
 │   ├── main.cpp
 │   ├── DeviceClient.*
@@ -598,7 +608,8 @@ KernelScope/
 - User-image classification uses a suffix heuristic and can be imperfect.
 - Authenticode uses cache-only revocation behavior by default; status can be unknown.
 - Entropy and mitigation findings can produce legitimate false positives.
-- Hosted CI does not build, sign, install, or run the driver.
+- Hosted CI builds and validates the unsigned driver package but does not sign,
+  install, load, or exercise it in kernel mode.
 - No production-supported release or vulnerability-free guarantee is claimed.
 
 ## Roadmap
@@ -636,6 +647,8 @@ not convert this educational project into a supported or production-safe driver.
 
 ## Official references
 
+- [Download the Windows Driver Kit](https://learn.microsoft.com/windows-hardware/drivers/download-the-wdk)
+- [Install the WDK using NuGet](https://learn.microsoft.com/windows-hardware/drivers/install-the-wdk-using-nuget)
 - [Using KMDF with non-PnP drivers](https://learn.microsoft.com/windows-hardware/drivers/wdf/using-kernel-mode-driver-framework-with-non-pnp-drivers)
 - [WdfControlDeviceInitAllocate](https://learn.microsoft.com/windows-hardware/drivers/ddi/wdfcontrol/nf-wdfcontrol-wdfcontroldeviceinitallocate)
 - [Security descriptors for device objects](https://learn.microsoft.com/windows-hardware/drivers/kernel/security-descriptors-for-device-objects)

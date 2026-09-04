@@ -66,13 +66,13 @@ that:
 - requires at least one approving review when collaborators are present;
 - dismisses stale approvals after new commits;
 - requires conversation resolution;
-- requires the user-mode CI and CodeQL checks observed on the first pull request;
+- requires the user-mode CI, WDK driver CI, and CodeQL checks observed on pull requests;
 - requires the branch to be current before merge when practical;
 - restricts direct pushes to maintainers or uses the same pull-request path for everyone.
 
 Do not guess required check names before the workflows have run once. Select the
-exact checks GitHub reports for `.github/workflows/ci.yml` and
-`.github/workflows/codeql.yml`.
+exact checks GitHub reports for `.github/workflows/ci.yml`,
+`.github/workflows/wdk-driver.yml`, and `.github/workflows/codeql.yml`.
 
 Avoid allowing administrators to bypass the ruleset for ordinary changes. Keep
 an emergency path documented and auditable.
@@ -159,7 +159,8 @@ Follow `docs/RELEASE.md`. For the initial publication:
 1. keep the project marked pre-1.0;
 2. publish source only;
 3. attach the source archive hash and validation summary;
-4. state clearly that the driver requires independent Windows/WDK build and VM testing;
+4. attach the hosted WDK compile/INF evidence and state that isolated-VM runtime
+   testing is still required;
 5. do not attach unsigned, test-signed, or privately signed driver binaries;
 6. do not claim production support or vulnerability-free status.
 
@@ -183,7 +184,7 @@ After the first push:
 - verify README badges and every local documentation link;
 - confirm the MIT license is detected;
 - confirm issue forms render correctly;
-- run CI and CodeQL once;
+- run user-mode CI, WDK driver CI, and CodeQL once;
 - select the observed status checks in the branch ruleset;
 - verify private vulnerability reporting;
 - verify Dependabot configuration;

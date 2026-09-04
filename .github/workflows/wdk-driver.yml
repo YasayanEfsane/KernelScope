@@ -35,7 +35,10 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out validation source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Select Visual Studio 2022 MSBuild
         uses: microsoft/setup-msbuild@v3
@@ -55,8 +58,14 @@ jobs:
           $msbuildVersion = (& $msbuildPath -version -nologo |
             Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
             Select-Object -Last 1).Trim()
+          $checkedOutSha = (& git rev-parse --verify HEAD).Trim()
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Unable to resolve the checked-out Git commit.'
+          }
+
           @(
             "SourceSha=$env:SOURCE_SHA"
+            "CheckedOutSha=$checkedOutSha"
             "RunnerImage=$env:ImageOS"
             "RunnerImageVersion=$env:ImageVersion"
             "OSCaption=$($os.Caption)"
@@ -218,8 +227,13 @@ jobs:
             throw 'The Release x64 driver binary was not produced.'
           }
 
+          $releaseInfPath = Join-Path $releaseDriver.Directory.FullName 'KernelScopeDriver.inf'
+          if (-not (Test-Path -LiteralPath $releaseInfPath -PathType Leaf)) {
+            throw 'The stamped Release x64 INF was not produced beside the driver.'
+          }
+
           $stagedDriver = Copy-Item -LiteralPath $releaseDriver.FullName -Destination (Join-Path $stageRoot 'KernelScopeDriver.sys') -PassThru
-          $stagedInf = Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'driver\KernelScopeDriver.inf') -Destination (Join-Path $stageRoot 'KernelScopeDriver.inf') -PassThru
+          $stagedInf = Copy-Item -LiteralPath $releaseInfPath -Destination (Join-Path $stageRoot 'KernelScopeDriver.inf') -PassThru
 
           $infVerifCandidates = Get-ChildItem -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'packages') -Filter 'InfVerif.exe' -File -Recurse
           $infVerif = $infVerifCandidates | Where-Object { $_.FullName -match '[\\/]x64[\\/]' } | Select-Object -First 1
@@ -231,11 +245,20 @@ jobs:
           }
 
           $infLog = Join-Path $evidenceRoot 'infverif.log'
+          @(
+            "Tool=$($infVerif.FullName)"
+            'Mode=/u'
+            "Input=$($stagedInf.FullName)"
+          ) | Set-Content -LiteralPath $infLog -Encoding utf8NoBOM
+
           Push-Location $infVerif.Directory.FullName
           try {
-            & $infVerif.FullName /u $stagedInf.FullName 2>&1 | Tee-Object -FilePath $infLog
-            if ($LASTEXITCODE -ne 0) {
-              throw "InfVerif /u failed with exit code $LASTEXITCODE."
+            & $infVerif.FullName /u $stagedInf.FullName 2>&1 |
+              Tee-Object -FilePath $infLog -Append
+            $infVerifExitCode = $LASTEXITCODE
+            "ExitCode=$infVerifExitCode" | Add-Content -LiteralPath $infLog
+            if ($infVerifExitCode -ne 0) {
+              throw "InfVerif /u failed with exit code $infVerifExitCode."
             }
           }
           finally {
@@ -249,7 +272,8 @@ jobs:
 
           $driverHash = Get-FileHash -LiteralPath $stagedDriver.FullName -Algorithm SHA256
           @(
-            "DriverFile=$($releaseDriver.FullName)"
+            'DriverFile=driver\x64\Release\KernelScopeDriver.sys'
+            'InfFile=driver\x64\Release\KernelScopeDriver.inf'
             "DriverBytes=$($stagedDriver.Length)"
             "DriverSha256=$($driverHash.Hash.ToLowerInvariant())"
             "SignatureStatus=$($signature.Status)"
@@ -265,6 +289,14 @@ jobs:
           $evidenceRoot = Join-Path $env:GITHUB_WORKSPACE 'artifacts\wdk-evidence'
           if (-not (Test-Path -LiteralPath $evidenceRoot)) {
             throw 'The WDK evidence directory was not created.'
+          }
+
+          $allowedExtensions = @('.txt', '.log')
+          $unexpected = Get-ChildItem -LiteralPath $evidenceRoot -File -Recurse |
+            Where-Object { $_.Extension.ToLowerInvariant() -notin $allowedExtensions }
+          if ($unexpected) {
+            $names = ($unexpected.FullName -join ', ')
+            throw "Only text evidence may be uploaded; unexpected files: $names"
           }
 
           $forbiddenExtensions = @(

@@ -16,6 +16,8 @@ All notable changes are documented here. The project follows the spirit of
 - Bounds-checked PE/COFF parser, SHA-256, and Authenticode classification.
 - Dependency-free offline tests and optional isolated-VM integration guidance.
 - Windows user-mode CI, CodeQL, threat model, hardening, and operational docs.
+- Pinned Visual Studio 2022/WDK 26100 driver CI with Debug/Release builds,
+  Universal INF verification, unsigned-output checks, and text-only evidence.
 - Portfolio-grade repository landing page with architecture, quick-start,
   protocol, testing, troubleshooting, and documentation indexes.
 - Protocol ABI reference and formal release-evidence procedure.
