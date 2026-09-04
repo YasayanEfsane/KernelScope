@@ -1,6 +1,11 @@
 #include "Driver.h"
 #include "Trace.h"
 
+#ifdef ALLOC_PRAGMA
+#pragma alloc_text(PAGE, KsTelemetryStart)
+#pragma alloc_text(PAGE, KsTelemetryStop)
+#endif
+
 static VOID KsInitializeEvent(_Out_ KS_TELEMETRY_EVENT* Event, _In_ UINT16 EventType)
 {
     LARGE_INTEGER timestamp;
@@ -190,7 +195,3 @@ VOID KsTelemetryStop(PDEVICE_CONTEXT Context)
     }
 }
 
-#ifdef ALLOC_PRAGMA
-#pragma alloc_text(PAGE, KsTelemetryStart)
-#pragma alloc_text(PAGE, KsTelemetryStop)
-#endif

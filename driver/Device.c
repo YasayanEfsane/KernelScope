@@ -1,6 +1,10 @@
 #include "Driver.h"
 #include "Trace.h"
 
+#ifdef ALLOC_PRAGMA
+#pragma alloc_text(PAGE, KsCreateControlDevice)
+#endif
+
 static const UNICODE_STRING g_DeviceName = RTL_CONSTANT_STRING(L"\\Device\\KernelScope");
 static const UNICODE_STRING g_SymbolicLink = RTL_CONSTANT_STRING(L"\\DosDevices\\KernelScope");
 
@@ -109,6 +113,3 @@ VOID KsEvtFileCleanup(WDFFILEOBJECT FileObject)
     UNREFERENCED_PARAMETER(FileObject);
 }
 
-#ifdef ALLOC_PRAGMA
-#pragma alloc_text(PAGE, KsCreateControlDevice)
-#endif
