@@ -1,0 +1,7 @@
+# Default owner for all repository changes.
+* @YasayanEfsane
+
+# Security-sensitive and release-critical areas.
+/.github/ @YasayanEfsane
+/driver/ @YasayanEfsane
+/shared/ @YasayanEfsane
