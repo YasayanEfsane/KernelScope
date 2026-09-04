@@ -12,6 +12,21 @@ administrator rights or a loaded driver:
 The executable returns nonzero on any failed case. Tests construct PE byte
 arrays in memory and do not download or execute a corpus.
 
+## Hosted Windows/WDK validation
+
+`.github/workflows/wdk-driver.yml` provides a reproducible compile/package gate
+on `windows-2022`. It selects Visual Studio 2022/MSBuild 17, restores the
+Microsoft WDK and matching SDK packages at `10.0.26100.6584`, and rebuilds the
+x64 KMDF driver in Debug and Release.
+
+The job then validates the stamped Release INF with `InfVerif /u`, confirms the
+driver remains unsigned, and uploads only text environment, restore, build, INF,
+and hash evidence. An explicit allowlist rejects non-text evidence artifacts.
+
+This hosted job never installs, starts, signs, or uploads the driver binary. It
+does not replace the isolated-VM integration matrix, HVCI testing, crash-dump
+review, or the manual Driver Verifier procedure below.
+
 ## Optional isolated-VM integration matrix
 
 Take a snapshot, build and test-sign the driver, install it, then run the basic

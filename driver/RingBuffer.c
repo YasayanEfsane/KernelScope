@@ -1,5 +1,10 @@
 #include "Driver.h"
 
+#ifdef ALLOC_PRAGMA
+#pragma alloc_text(PAGE, KsRingInitialize)
+#pragma alloc_text(PAGE, KsRingCleanup)
+#endif
+
 C_ASSERT(KS_RING_CAPACITY <= (MAXULONG_PTR / sizeof(KS_TELEMETRY_EVENT)));
 
 static VOID KsSaturatingIncrement(_Inout_ UINT64* Value)
@@ -226,7 +231,3 @@ VOID KsRingCleanup(KS_RING_BUFFER* Ring)
     }
 }
 
-#ifdef ALLOC_PRAGMA
-#pragma alloc_text(PAGE, KsRingInitialize)
-#pragma alloc_text(PAGE, KsRingCleanup)
-#endif

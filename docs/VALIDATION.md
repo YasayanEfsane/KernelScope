@@ -1,12 +1,50 @@
 # Validation record
 
+## 2026-09-04 hosted Windows/WDK validation
+
+Pull request [#7](https://github.com/YasayanEfsane/KernelScope/pull/7)
+introduced a real WDK validation job. The first complete proof was
+[wdk-driver-ci run 4](https://github.com/YasayanEfsane/KernelScope/actions/runs/33869017695)
+for source commit `7c9ace873b9d59d6e38bdfe3f252623fc3b7ba8f`.
+
+| Component | Observed value |
+| --- | --- |
+| Runner | Windows Server 2022 Datacenter, build 20348 |
+| Runner image | `windows-2022`, image `20260830.290.1` |
+| Visual Studio | Enterprise 2022, `17.14.37614.0` |
+| MSBuild | x64 `17.14.51.32402` |
+| WDK and SDK NuGet packages | `10.0.26100.6584` |
+| Driver target | x64, KMDF 1.15, Universal |
+| Configurations | Debug and Release |
+
+The successful job:
+
+- restored exact Microsoft WDK and matching SDK package versions;
+- selected Visual Studio 2022/MSBuild 17 explicitly instead of a floating
+  Visual Studio major version;
+- rebuilt every driver C source in Debug and Release with `/W4`, warnings as
+  errors, SDL checks, Spectre mitigations, and `/INTEGRITYCHECK`;
+- linked the documented `Wdmsec.lib` dependency used by the secure device SDDL;
+- produced both x64 driver images without compiler or linker diagnostics;
+- ran `InfVerif /u` successfully;
+- confirmed that the Release image was `NotSigned`; and
+- uploaded only text logs and manifests after rejecting binary and signing
+  material from the evidence directory.
+
+The proof-run Release image was 13,824 bytes with SHA-256
+`15056a78aaceb8326f8a7fa4b1a3fec55ce04a3604dd5015a761ee9be23a2542`.
+This hash identifies ephemeral unsigned CI output; it is not a release artifact.
+The current workflow validates the stamped Release INF, records its exit code,
+and still does not upload the driver binary.
+
 ## 2026-08-20 source-delivery validation
 
 The generation environment was Linux and did not contain Visual Studio, MSVC,
 the Windows SDK, the WDK, KMDF libraries, PowerShell, or a Windows kernel. No
-claim is made that the driver or complete Windows executables were built here.
+claim was made at that time that the driver or complete Windows executables had
+been built there.
 
-Checks completed in the available environment:
+Checks completed in that environment:
 
 - `Protocol.h` and `ProtocolValidation.h` compiled as strict C11.
 - The protocol offline test executable compiled as C++17 with `-Wall -Wextra
@@ -27,18 +65,19 @@ Checks completed in the available environment:
 - Source scanning found no `METHOD_NEITHER`, direct I/O method, arbitrary-memory
   primitive, forbidden hook/patch primitive, compiled binary, certificate, or
   private-key artifact.
-- The final source archive passed a complete ZIP integrity check after all
-  documentation, governance, and repository metadata updates.
+- The source archive passed a complete ZIP integrity check.
 
-Required Windows release validation remains:
+## Validation still required before a driver release
 
-1. Build all relevant projects with Visual Studio 2022, the paired current
-   Windows SDK/WDK, `/W4`, warnings as errors, and WDK Code Analysis.
-2. Run `KernelScopeTests.exe` on Windows to exercise BCrypt SHA-256 and the real
-   SDK PE definitions.
-3. Sign and load only in a snapshotted isolated VM.
+Hosted compilation is a package-quality gate, not kernel runtime validation.
+A release candidate still requires:
+
+1. Run WDK Code Analysis/PREfast for Drivers with the recorded release toolchain.
+2. Build and sign only in an organization-controlled release environment.
+3. Load the signed package only in a snapshotted isolated VM.
 4. Run `KernelScopeIntegration.exe`, the PowerShell integration workflow, and
    the complete manual negative matrix in `TESTING.md`.
-5. Run Driver Verifier only under the explicit manual safety procedure.
-6. Record Windows build numbers, SDK/WDK versions, HVCI state, hashes, logs, and
-   any deviations before assigning a release tag.
+5. Exercise HVCI/Memory Integrity compatibility and run Driver Verifier only
+   under the explicit manual safety procedure.
+6. Record Windows build numbers, toolchain versions, hashes, logs, signing
+   provenance, and every deviation before assigning a release tag.

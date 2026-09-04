@@ -1,5 +1,9 @@
 #include "Driver.h"
 
+#ifdef ALLOC_PRAGMA
+#pragma alloc_text(PAGE, KsQueueInitialize)
+#endif
+
 static VOID KsInitializeHeader(
     _Out_ KS_PROTOCOL_HEADER* Header,
     _In_ UINT32 Size,
@@ -255,6 +259,3 @@ VOID KsEvtIoDeviceControl(
     WdfRequestCompleteWithInformation(Request, status, information);
 }
 
-#ifdef ALLOC_PRAGMA
-#pragma alloc_text(PAGE, KsQueueInitialize)
-#endif

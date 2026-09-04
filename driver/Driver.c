@@ -1,6 +1,11 @@
 #include "Driver.h"
 #include "Trace.h"
 
+#ifdef ALLOC_PRAGMA
+#pragma alloc_text(INIT, DriverEntry)
+#pragma alloc_text(PAGE, KsEvtDriverUnload)
+#endif
+
 PDEVICE_CONTEXT volatile g_KsDeviceContext = NULL;
 
 _Use_decl_annotations_
@@ -60,7 +65,3 @@ VOID KsEvtDriverUnload(WDFDRIVER Driver)
     }
 }
 
-#ifdef ALLOC_PRAGMA
-#pragma alloc_text(INIT, DriverEntry)
-#pragma alloc_text(PAGE, KsEvtDriverUnload)
-#endif

@@ -40,10 +40,11 @@
       <WarningLevel>Level4</WarningLevel>
       <SpectreMitigation>Spectre</SpectreMitigation>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_KERNEL_MODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+
     </ClCompile>
     <Link>
       <EntryPointSymbol>DriverEntry</EntryPointSymbol>
+      <AdditionalDependencies>Wdmsec.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/INTEGRITYCHECK %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
