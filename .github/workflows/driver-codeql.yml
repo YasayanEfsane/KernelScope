@@ -69,8 +69,8 @@ jobs:
             "CodeQLCliVersion=$env:CODEQL_CLI_VERSION"
             "DriverQueryPack=microsoft/windows-drivers@$env:DRIVER_QUERY_PACK_VERSION"
             "WDKNuGetVersion=$env:WDK_NUGET_VERSION"
-            'RecommendedSuite=windows-driver-suites/recommended.qls'
-            'MustFixSuite=windows-driver-suites/mustfix.qls'
+            'RecommendedSuite=windows-driver-suites/windows_recommended_partial.qls'
+            'MustFixSuite=windows-driver-suites/windows_mustfix_partial.qls'
           ) | Set-Content -LiteralPath (Join-Path $evidenceRoot 'environment.txt') -Encoding utf8NoBOM
 
       - name: Ensure Visual Studio 2022 WDK component
@@ -198,8 +198,8 @@ jobs:
             throw "CodeQL driver query-pack download failed with exit code $LASTEXITCODE."
           }
 
-          $recommendedQuery = "microsoft/windows-drivers@${env:DRIVER_QUERY_PACK_VERSION}:windows-driver-suites/recommended.qls"
-          $mustFixQuery = "microsoft/windows-drivers@${env:DRIVER_QUERY_PACK_VERSION}:windows-driver-suites/mustfix.qls"
+          $recommendedQuery = "microsoft/windows-drivers@${env:DRIVER_QUERY_PACK_VERSION}:windows-driver-suites/windows_recommended_partial.qls"
+          $mustFixQuery = "microsoft/windows-drivers@${env:DRIVER_QUERY_PACK_VERSION}:windows-driver-suites/windows_mustfix_partial.qls"
           foreach ($query in @($recommendedQuery, $mustFixQuery)) {
             & $codeql resolve queries $query 2>&1 | Tee-Object -FilePath $installLog -Append
             if ($LASTEXITCODE -ne 0) {
