@@ -2,12 +2,12 @@
 
 ## Driver-specific CodeQL policy
 
-The dedicated `driver-codeql.yml` workflow uses CodeQL CLI 2.15.4 and
-`microsoft/windows-drivers` 1.1.0, the versions documented by Microsoft for the
-Windows 11 24H2 toolchain targeted by the pinned WDK 26100 packages. It captures
-an x64 Release KMDF build, runs both the recommended and must-fix driver suites,
-publishes the recommended SARIF to GitHub code scanning, and fails when the
-must-fix suite reports a result.
+The dedicated `driver-codeql.yml` workflow uses CodeQL CLI 2.25.5 and
+`microsoft/windows-drivers` 1.10.0, pinned to Microsoft's current general-use
+combination for driver analysis. The captured x64 Release KMDF build continues
+to use the repository's WDK/SDK 10.0.26100.6584 packages. The workflow runs both
+the recommended and must-fix driver suites, publishes the recommended SARIF to
+GitHub code scanning, and fails when the must-fix suite reports a result.
 
 Only SARIF and text evidence are uploaded. The workflow never installs, starts,
 signs, or uploads the driver binary and does not use signing credentials. This
