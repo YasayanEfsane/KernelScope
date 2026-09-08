@@ -500,7 +500,8 @@ in [`docs/TESTING.md`](docs/TESTING.md).
   uploads text evidence only.
 - `codeql.yml` analyzes C and C++ user-mode build targets.
 - `driver-codeql.yml` captures the x64 Release KMDF build with CodeQL CLI
-  2.25.5 and `microsoft/windows-drivers` 1.10.0.
+  2.25.5, `microsoft/windows-drivers` 1.10.0, and its pinned
+  `microsoft/cpp-queries` 0.0.5 dependency.
 - The driver job publishes recommended SARIF, blocks must-fix results, and
   uploads only SARIF and text evidence.
 - No hosted workflow loads the driver or handles signing secrets.
