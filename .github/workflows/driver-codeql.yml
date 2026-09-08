@@ -29,6 +29,7 @@ concurrency:
 env:
   CODEQL_CLI_VERSION: 2.25.5
   DRIVER_QUERY_PACK_VERSION: 1.10.0
+  MICROSOFT_CPP_QUERY_PACK_VERSION: 0.0.5
   WDK_NUGET_VERSION: 10.0.26100.6584
   SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -68,6 +69,7 @@ jobs:
             "RunnerImageVersion=$env:ImageVersion"
             "CodeQLCliVersion=$env:CODEQL_CLI_VERSION"
             "DriverQueryPack=microsoft/windows-drivers@$env:DRIVER_QUERY_PACK_VERSION"
+            "MicrosoftCppQueryPack=microsoft/cpp-queries@$env:MICROSOFT_CPP_QUERY_PACK_VERSION"
             "WDKNuGetVersion=$env:WDK_NUGET_VERSION"
             'RecommendedSuite=windows-driver-suites/recommended.qls'
             'MustFixSuite=windows-driver-suites/mustfix.qls'
@@ -196,6 +198,12 @@ jobs:
             Tee-Object -FilePath $installLog -Append
           if ($LASTEXITCODE -ne 0) {
             throw "CodeQL driver query-pack download failed with exit code $LASTEXITCODE."
+          }
+
+          & $codeql pack download "microsoft/cpp-queries@$env:MICROSOFT_CPP_QUERY_PACK_VERSION" 2>&1 |
+            Tee-Object -FilePath $installLog -Append
+          if ($LASTEXITCODE -ne 0) {
+            throw "Microsoft C++ query-pack download failed with exit code $LASTEXITCODE."
           }
 
           $recommendedQuery = "microsoft/windows-drivers@${env:DRIVER_QUERY_PACK_VERSION}:windows-driver-suites/recommended.qls"
