@@ -2,9 +2,9 @@
 
 ## Driver-specific CodeQL policy
 
-The dedicated `driver-codeql.yml` workflow uses CodeQL CLI 2.25.5 and
-`microsoft/windows-drivers` 1.10.0, pinned to Microsoft's current general-use
-combination for driver analysis. The captured x64 Release KMDF build continues
+The dedicated `driver-codeql.yml` workflow uses CodeQL CLI 2.25.5,
+`microsoft/windows-drivers` 1.10.0, and `microsoft/cpp-queries` 0.0.5, pinned to
+Microsoft's current general-use combination for driver analysis. The captured x64 Release KMDF build continues
 to use the repository's WDK/SDK 10.0.26100.6584 packages. The workflow runs both
 the recommended and must-fix driver suites, publishes the recommended SARIF to
 GitHub code scanning, and fails when the must-fix suite reports a result.
