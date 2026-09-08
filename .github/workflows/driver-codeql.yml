@@ -332,9 +332,20 @@ jobs:
           }
 
           $recommendedDocument = Get-Content -LiteralPath $recommendedSarif -Raw | ConvertFrom-Json -Depth 100
-          $recommendedCount = @($recommendedDocument.runs.results).Count
+          $recommendedCount = 0
+          foreach ($run in @($recommendedDocument.runs)) {
+            if ($null -ne $run.results) {
+              $recommendedCount += @($run.results).Count
+            }
+          }
+
           $mustFixDocument = Get-Content -LiteralPath $mustFixSarif -Raw | ConvertFrom-Json -Depth 100
-          $mustFixCount = @($mustFixDocument.runs.results).Count
+          $mustFixCount = 0
+          foreach ($run in @($mustFixDocument.runs)) {
+            if ($null -ne $run.results) {
+              $mustFixCount += @($run.results).Count
+            }
+          }
 
           @(
             "RecommendedResults=$recommendedCount"
