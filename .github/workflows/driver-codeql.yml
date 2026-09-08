@@ -27,8 +27,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CODEQL_CLI_VERSION: 2.15.4
-  DRIVER_QUERY_PACK_VERSION: 1.1.0
+  CODEQL_CLI_VERSION: 2.25.5
+  DRIVER_QUERY_PACK_VERSION: 1.10.0
   WDK_NUGET_VERSION: 10.0.26100.6584
   SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -69,8 +69,8 @@ jobs:
             "CodeQLCliVersion=$env:CODEQL_CLI_VERSION"
             "DriverQueryPack=microsoft/windows-drivers@$env:DRIVER_QUERY_PACK_VERSION"
             "WDKNuGetVersion=$env:WDK_NUGET_VERSION"
-            'RecommendedSuite=windows-driver-suites/windows_recommended_partial.qls'
-            'MustFixSuite=windows-driver-suites/windows_mustfix_partial.qls'
+            'RecommendedSuite=windows-driver-suites/recommended.qls'
+            'MustFixSuite=windows-driver-suites/mustfix.qls'
           ) | Set-Content -LiteralPath (Join-Path $evidenceRoot 'environment.txt') -Encoding utf8NoBOM
 
       - name: Ensure Visual Studio 2022 WDK component
@@ -198,8 +198,8 @@ jobs:
             throw "CodeQL driver query-pack download failed with exit code $LASTEXITCODE."
           }
 
-          $recommendedQuery = "microsoft/windows-drivers@${env:DRIVER_QUERY_PACK_VERSION}:windows-driver-suites/windows_recommended_partial.qls"
-          $mustFixQuery = "microsoft/windows-drivers@${env:DRIVER_QUERY_PACK_VERSION}:windows-driver-suites/windows_mustfix_partial.qls"
+          $recommendedQuery = "microsoft/windows-drivers@${env:DRIVER_QUERY_PACK_VERSION}:windows-driver-suites/recommended.qls"
+          $mustFixQuery = "microsoft/windows-drivers@${env:DRIVER_QUERY_PACK_VERSION}:windows-driver-suites/mustfix.qls"
           foreach ($query in @($recommendedQuery, $mustFixQuery)) {
             & $codeql resolve queries $query 2>&1 | Tee-Object -FilePath $installLog -Append
             if ($LASTEXITCODE -ne 0) {
@@ -297,21 +297,10 @@ jobs:
             throw "Must-fix driver analysis failed with exit code $LASTEXITCODE."
           }
 
-          $mustFixDocument = Get-Content -LiteralPath $mustFixSarif -Raw | ConvertFrom-Json -Depth 100
-          $mustFixCount = 0
-          foreach ($run in @($mustFixDocument.runs)) {
-            if ($null -ne $run.results) {
-              $mustFixCount += @($run.results).Count
-            }
-          }
-
           $recommendedDocument = Get-Content -LiteralPath $recommendedSarif -Raw | ConvertFrom-Json -Depth 100
-          $recommendedCount = 0
-          foreach ($run in @($recommendedDocument.runs)) {
-            if ($null -ne $run.results) {
-              $recommendedCount += @($run.results).Count
-            }
-          }
+          $recommendedCount = @($recommendedDocument.runs.results).Count
+          $mustFixDocument = Get-Content -LiteralPath $mustFixSarif -Raw | ConvertFrom-Json -Depth 100
+          $mustFixCount = @($mustFixDocument.runs.results).Count
 
           @(
             "RecommendedResults=$recommendedCount"
@@ -319,7 +308,7 @@ jobs:
           ) | Set-Content -LiteralPath (Join-Path $evidenceRoot 'result-summary.txt') -Encoding utf8NoBOM
 
           "MUSTFIX_COUNT=$mustFixCount" | Add-Content -LiteralPath $env:GITHUB_ENV
-          "### Driver CodeQL results`n`n- Recommended: $recommendedCount`n- Must-fix: $mustFixCount" |
+          "### Driver CodeQL results`n`n- Recommended results: $recommendedCount`n- Must-fix results: $mustFixCount" |
             Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
 
       - name: Enforce evidence-only artifact policy
