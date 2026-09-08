@@ -1,0 +1,387 @@
+name: driver-codeql
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/driver-codeql.yml'
+      - 'Directory.Build.props'
+      - 'packages.config'
+      - 'driver/**'
+      - 'shared/**'
+  pull_request:
+    paths:
+      - '.github/workflows/driver-codeql.yml'
+      - 'Directory.Build.props'
+      - 'packages.config'
+      - 'driver/**'
+      - 'shared/**'
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: driver-codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CODEQL_CLI_VERSION: 2.15.4
+  DRIVER_QUERY_PACK_VERSION: 1.1.0
+  WDK_NUGET_VERSION: 10.0.26100.6584
+  SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  analyze-driver:
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out analysis source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Select Visual Studio 2022 MSBuild
+        uses: microsoft/setup-msbuild@v3
+        with:
+          vs-version: '[17.0,18.0)'
+          msbuild-architecture: x64
+
+      - name: Prepare text evidence
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidenceRoot = Join-Path $env:GITHUB_WORKSPACE 'artifacts\driver-codeql-evidence'
+          New-Item -ItemType Directory -Path $evidenceRoot -Force | Out-Null
+
+          $checkedOutSha = (& git rev-parse --verify HEAD).Trim()
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Unable to resolve the checked-out Git commit.'
+          }
+
+          @(
+            "SourceSha=$env:SOURCE_SHA"
+            "CheckedOutSha=$checkedOutSha"
+            "RunnerImage=$env:ImageOS"
+            "RunnerImageVersion=$env:ImageVersion"
+            "CodeQLCliVersion=$env:CODEQL_CLI_VERSION"
+            "DriverQueryPack=microsoft/windows-drivers@$env:DRIVER_QUERY_PACK_VERSION"
+            "WDKNuGetVersion=$env:WDK_NUGET_VERSION"
+            'RecommendedSuite=windows-driver-suites/recommended.qls'
+            'MustFixSuite=windows-driver-suites/mustfix.qls'
+          ) | Set-Content -LiteralPath (Join-Path $evidenceRoot 'environment.txt') -Encoding utf8NoBOM
+
+      - name: Ensure Visual Studio 2022 WDK component
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidenceRoot = Join-Path $env:GITHUB_WORKSPACE 'artifacts\driver-codeql-evidence'
+          $componentLog = Join-Path $evidenceRoot 'visual-studio-wdk-component.txt'
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $visualStudioRange = '[17.0,18.0)'
+
+          if (-not (Test-Path -LiteralPath $vswhere)) {
+            throw "vswhere.exe was not found at $vswhere"
+          }
+
+          $installationPath = & $vswhere -latest -version $visualStudioRange -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1
+          if ([string]::IsNullOrWhiteSpace($installationPath)) {
+            throw 'No Visual Studio 2022 installation with the x64 C++ toolset was found.'
+          }
+
+          $installationPath = $installationPath.Trim()
+          "VisualStudioPath=$installationPath" | Set-Content -LiteralPath $componentLog
+
+          $wdkInstallation = & $vswhere -latest -version $visualStudioRange -products * -requires Microsoft.Windows.DriverKit -property installationPath | Select-Object -First 1
+          if ([string]::IsNullOrWhiteSpace($wdkInstallation)) {
+            $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe"
+            if (-not (Test-Path -LiteralPath $installer)) {
+              throw "Visual Studio Installer was not found at $installer"
+            }
+
+            'Microsoft.Windows.DriverKit is not present in Visual Studio 2022; installing it.' | Add-Content -LiteralPath $componentLog
+            $arguments = @(
+              'modify'
+              '--installPath'
+              ('"' + $installationPath + '"')
+              '--channelId'
+              'VisualStudio.17.Release'
+              '--add'
+              'Microsoft.Windows.DriverKit'
+              '--quiet'
+              '--norestart'
+              '--nocache'
+            )
+            $process = Start-Process -FilePath $installer -ArgumentList $arguments -WorkingDirectory $env:GITHUB_WORKSPACE -Wait -PassThru
+            "InstallerExitCode=$($process.ExitCode)" | Add-Content -LiteralPath $componentLog
+            if ($process.ExitCode -notin @(0, 3010)) {
+              throw "Visual Studio Installer failed with exit code $($process.ExitCode)."
+            }
+          }
+          else {
+            'Microsoft.Windows.DriverKit is already present in Visual Studio 2022.' | Add-Content -LiteralPath $componentLog
+          }
+
+          $verifiedPath = & $vswhere -latest -version $visualStudioRange -products * -requires Microsoft.Windows.DriverKit -property installationPath | Select-Object -First 1
+          $installationVersion = & $vswhere -latest -version $visualStudioRange -products * -requires Microsoft.Windows.DriverKit -property installationVersion | Select-Object -First 1
+          if ([string]::IsNullOrWhiteSpace($verifiedPath) -or
+              [string]::IsNullOrWhiteSpace($installationVersion) -or
+              $installationVersion.Trim() -notmatch '^17\.') {
+            throw "The Visual Studio 2022 WDK component could not be verified. Version: $installationVersion"
+          }
+
+          "VerifiedVisualStudioPath=$($verifiedPath.Trim())" | Add-Content -LiteralPath $componentLog
+          "VisualStudioVersion=$($installationVersion.Trim())" | Add-Content -LiteralPath $componentLog
+
+      - name: Restore pinned WDK and SDK packages
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidenceRoot = Join-Path $env:GITHUB_WORKSPACE 'artifacts\driver-codeql-evidence'
+          $restoreLog = Join-Path $evidenceRoot 'nuget-restore.log'
+
+          & nuget restore .\packages.config -PackagesDirectory .\packages -NonInteractive -Verbosity normal 2>&1 |
+            Tee-Object -FilePath $restoreLog
+          if ($LASTEXITCODE -ne 0) {
+            throw "NuGet restore failed with exit code $LASTEXITCODE."
+          }
+
+          $version = $env:WDK_NUGET_VERSION
+          $expectedFiles = @(
+            ".\packages\Microsoft.Windows.WDK.x64.$version\build\native\Microsoft.Windows.WDK.x64.props"
+            ".\packages\Microsoft.Windows.SDK.CPP.x64.$version\build\native\Microsoft.Windows.SDK.cpp.x64.props"
+            ".\packages\Microsoft.Windows.SDK.CPP.$version\build\native\Microsoft.Windows.SDK.cpp.props"
+          )
+          foreach ($file in $expectedFiles) {
+            if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
+              throw "Required pinned toolchain file was not restored: $file"
+            }
+            "Verified=$file" | Add-Content -LiteralPath $restoreLog
+          }
+
+      - name: Install pinned CodeQL CLI and driver queries
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidenceRoot = Join-Path $env:GITHUB_WORKSPACE 'artifacts\driver-codeql-evidence'
+          $installLog = Join-Path $evidenceRoot 'codeql-install.log'
+          $toolRoot = Join-Path $env:RUNNER_TEMP "kernelscope-codeql-$env:CODEQL_CLI_VERSION"
+          $archivePath = Join-Path $env:RUNNER_TEMP "codeql-win64-$env:CODEQL_CLI_VERSION.zip"
+          $archiveUri = "https://github.com/github/codeql-cli-binaries/releases/download/v$env:CODEQL_CLI_VERSION/codeql-win64.zip"
+
+          Invoke-WebRequest -Uri $archiveUri -OutFile $archivePath
+          $archiveHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+          Expand-Archive -LiteralPath $archivePath -DestinationPath $toolRoot -Force
+
+          $codeql = Join-Path $toolRoot 'codeql\codeql.exe'
+          if (-not (Test-Path -LiteralPath $codeql -PathType Leaf)) {
+            throw "Pinned CodeQL executable was not found at $codeql"
+          }
+
+          $versionOutput = (& $codeql version 2>&1 | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or $versionOutput -notmatch "\b$([regex]::Escape($env:CODEQL_CLI_VERSION))\b") {
+            throw "Unexpected CodeQL version output: $versionOutput"
+          }
+
+          @(
+            "ArchiveUri=$archiveUri"
+            "ArchiveSha256=$archiveHash"
+            "CodeQLPath=$codeql"
+            $versionOutput
+          ) | Set-Content -LiteralPath $installLog -Encoding utf8NoBOM
+
+          & $codeql pack download "microsoft/windows-drivers@$env:DRIVER_QUERY_PACK_VERSION" 2>&1 |
+            Tee-Object -FilePath $installLog -Append
+          if ($LASTEXITCODE -ne 0) {
+            throw "CodeQL driver query-pack download failed with exit code $LASTEXITCODE."
+          }
+
+          $packRoot = Join-Path $env:USERPROFILE ".codeql\packages\microsoft\windows-drivers\$env:DRIVER_QUERY_PACK_VERSION"
+          $recommendedSuite = Join-Path $packRoot 'windows-driver-suites\recommended.qls'
+          $mustFixSuite = Join-Path $packRoot 'windows-driver-suites\mustfix.qls'
+          foreach ($suite in @($recommendedSuite, $mustFixSuite)) {
+            if (-not (Test-Path -LiteralPath $suite -PathType Leaf)) {
+              throw "Required pinned driver query suite was not found: $suite"
+            }
+            "VerifiedSuite=$suite" | Add-Content -LiteralPath $installLog
+          }
+
+          "CODEQL_EXE=$codeql" | Add-Content -LiteralPath $env:GITHUB_ENV
+          "DRIVER_QUERY_PACK_ROOT=$packRoot" | Add-Content -LiteralPath $env:GITHUB_ENV
+
+      - name: Record analysis environment
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidenceRoot = Join-Path $env:GITHUB_WORKSPACE 'artifacts\driver-codeql-evidence'
+          $environmentFile = Join-Path $evidenceRoot 'environment.txt'
+          $os = Get-CimInstance Win32_OperatingSystem
+          $msbuildPath = (Get-Command msbuild -ErrorAction Stop).Source
+          $msbuildVersion = (& $msbuildPath -version -nologo |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -Last 1).Trim()
+
+          @(
+            "OSCaption=$($os.Caption)"
+            "OSVersion=$($os.Version)"
+            "MSBuildPath=$msbuildPath"
+            "MSBuildVersion=$msbuildVersion"
+          ) | Add-Content -LiteralPath $environmentFile -Encoding utf8NoBOM
+
+      - name: Create CodeQL database from Release driver build
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidenceRoot = Join-Path $env:GITHUB_WORKSPACE 'artifacts\driver-codeql-evidence'
+          $databaseRoot = Join-Path $env:RUNNER_TEMP 'kernelscope-driver-codeql-db'
+          $buildLog = Join-Path $evidenceRoot 'database-create.log'
+          $buildCommand = 'msbuild .\driver\KernelScopeDriver.vcxproj /m /t:Rebuild /nologo /verbosity:minimal /p:Configuration=Release /p:Platform=x64 /p:UsePinnedWdkNuGet=true /p:TargetPlatformVersion=10.0.26100.0 /p:WindowsTargetPlatformVersion=10.0.26100.0 /p:SignMode=Off /p:EnableInf2cat=false'
+          $arguments = @(
+            'database'
+            'create'
+            $databaseRoot
+            '--language=cpp'
+            "--source-root=$env:GITHUB_WORKSPACE"
+            "--command=$buildCommand"
+            '--threads=0'
+            '--overwrite'
+          )
+
+          & $env:CODEQL_EXE @arguments 2>&1 | Tee-Object -FilePath $buildLog
+          if ($LASTEXITCODE -ne 0) {
+            throw "CodeQL database creation or driver build failed with exit code $LASTEXITCODE."
+          }
+
+          "CODEQL_DATABASE=$databaseRoot" | Add-Content -LiteralPath $env:GITHUB_ENV
+
+      - name: Run recommended and must-fix driver suites
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidenceRoot = Join-Path $env:GITHUB_WORKSPACE 'artifacts\driver-codeql-evidence'
+          $recommendedSarif = Join-Path $evidenceRoot 'driver-recommended.sarif'
+          $mustFixSarif = Join-Path $evidenceRoot 'driver-mustfix.sarif'
+          $recommendedLog = Join-Path $evidenceRoot 'recommended-analysis.log'
+          $mustFixLog = Join-Path $evidenceRoot 'mustfix-analysis.log'
+          $recommendedSuite = Join-Path $env:DRIVER_QUERY_PACK_ROOT 'windows-driver-suites\recommended.qls'
+          $mustFixSuite = Join-Path $env:DRIVER_QUERY_PACK_ROOT 'windows-driver-suites\mustfix.qls'
+
+          $commonArguments = @(
+            '--format=sarifv2.1.0'
+            '--threads=0'
+            '--rerun'
+          )
+
+          $recommendedArguments = @(
+            'database'
+            'analyze'
+            $env:CODEQL_DATABASE
+            $recommendedSuite
+          ) + $commonArguments + @("--output=$recommendedSarif")
+          & $env:CODEQL_EXE @recommendedArguments 2>&1 |
+            Tee-Object -FilePath $recommendedLog
+          if ($LASTEXITCODE -ne 0) {
+            throw "Recommended driver analysis failed with exit code $LASTEXITCODE."
+          }
+
+          $mustFixArguments = @(
+            'database'
+            'analyze'
+            $env:CODEQL_DATABASE
+            $mustFixSuite
+          ) + $commonArguments + @("--output=$mustFixSarif")
+          & $env:CODEQL_EXE @mustFixArguments 2>&1 |
+            Tee-Object -FilePath $mustFixLog
+          if ($LASTEXITCODE -ne 0) {
+            throw "Must-fix driver analysis failed with exit code $LASTEXITCODE."
+          }
+
+          $mustFixDocument = Get-Content -LiteralPath $mustFixSarif -Raw | ConvertFrom-Json -Depth 100
+          $mustFixCount = 0
+          foreach ($run in @($mustFixDocument.runs)) {
+            if ($null -ne $run.results) {
+              $mustFixCount += @($run.results).Count
+            }
+          }
+
+          $recommendedDocument = Get-Content -LiteralPath $recommendedSarif -Raw | ConvertFrom-Json -Depth 100
+          $recommendedCount = 0
+          foreach ($run in @($recommendedDocument.runs)) {
+            if ($null -ne $run.results) {
+              $recommendedCount += @($run.results).Count
+            }
+          }
+
+          @(
+            "RecommendedResults=$recommendedCount"
+            "MustFixResults=$mustFixCount"
+          ) | Set-Content -LiteralPath (Join-Path $evidenceRoot 'result-summary.txt') -Encoding utf8NoBOM
+
+          "MUSTFIX_COUNT=$mustFixCount" | Add-Content -LiteralPath $env:GITHUB_ENV
+          "### Driver CodeQL results`n`n- Recommended: $recommendedCount`n- Must-fix: $mustFixCount" |
+            Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+
+      - name: Enforce evidence-only artifact policy
+        id: evidence-policy
+        if: ${{ always() }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidenceRoot = Join-Path $env:GITHUB_WORKSPACE 'artifacts\driver-codeql-evidence'
+          if (-not (Test-Path -LiteralPath $evidenceRoot -PathType Container)) {
+            throw 'The driver CodeQL evidence directory was not created.'
+          }
+
+          $allowedExtensions = @('.txt', '.log', '.sarif')
+          $unexpected = Get-ChildItem -LiteralPath $evidenceRoot -File -Recurse |
+            Where-Object { $_.Extension.ToLowerInvariant() -notin $allowedExtensions }
+          if ($unexpected) {
+            throw "Only SARIF and text evidence may be uploaded: $($unexpected.FullName -join ', ')"
+          }
+
+          $forbiddenExtensions = @(
+            '.sys', '.cat', '.cer', '.pfx', '.p12', '.pvk', '.key',
+            '.exe', '.dll', '.lib', '.obj', '.pdb', '.zip'
+          )
+          $forbidden = Get-ChildItem -LiteralPath $evidenceRoot -File -Recurse |
+            Where-Object { $_.Extension.ToLowerInvariant() -in $forbiddenExtensions }
+          if ($forbidden) {
+            throw "Forbidden binary or signing material entered the evidence directory: $($forbidden.FullName -join ', ')"
+          }
+
+      - name: Upload recommended SARIF to code scanning
+        if: ${{ steps.evidence-policy.outcome == 'success' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: artifacts/driver-codeql-evidence/driver-recommended.sarif
+          category: kernelscope-driver-recommended
+
+      - name: Explain fork pull-request upload restriction
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+        shell: pwsh
+        run: |
+          'SARIF upload is skipped for fork pull requests because GitHub withholds security-events write permission.' |
+            Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload driver CodeQL text and SARIF evidence
+        if: ${{ always() && steps.evidence-policy.outcome == 'success' && hashFiles('artifacts/driver-codeql-evidence/**') != '' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: driver-codeql-evidence
+          path: artifacts/driver-codeql-evidence
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce must-fix gate
+        if: ${{ always() && env.MUSTFIX_COUNT != '' }}
+        shell: pwsh
+        run: |
+          $mustFixCount = [int]$env:MUSTFIX_COUNT
+          if ($mustFixCount -gt 0) {
+            throw "Microsoft's driver must-fix suite reported $mustFixCount result(s). Review the uploaded SARIF; do not suppress them merely to pass CI."
+          }
+
+# Hosted analysis compiles but never installs, starts, signs, or uploads the
+# driver binary. Only SARIF and text evidence leave the job.
