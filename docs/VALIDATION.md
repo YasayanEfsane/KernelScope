@@ -1,5 +1,26 @@
 # Validation record
 
+## Driver-specific CodeQL policy
+
+The dedicated `driver-codeql.yml` workflow uses CodeQL CLI 2.25.5,
+`microsoft/windows-drivers` 1.10.0, and `microsoft/cpp-queries` 0.0.5, pinned to
+Microsoft's current general-use combination for driver analysis. The captured x64 Release KMDF build continues
+to use the repository's WDK/SDK 10.0.26100.6584 packages. The workflow runs both
+the recommended and must-fix driver suites, publishes the recommended SARIF to
+GitHub code scanning, and fails when the must-fix suite reports a result.
+
+Only SARIF and text evidence are uploaded. The workflow never installs, starts,
+signs, or uploads the driver binary and does not use signing credentials. This
+is static source analysis; it is not driver runtime validation, a Driver
+Verification Log, HLK completion, WHCP certification, or proof of kernel safety.
+
+Microsoft identifies CodeQL as the primary static-analysis direction for
+Windows drivers and documents that Static Driver Verifier is unavailable in
+WDKs newer than build 26017:
+
+- [CodeQL analysis for Windows driver code](https://learn.microsoft.com/windows-hardware/drivers/devtest/static-tools-and-codeql)
+- [Static Driver Verifier support status](https://learn.microsoft.com/windows-hardware/drivers/devtest/static-driver-verifier)
+
 ## 2026-09-04 hosted Windows/WDK validation
 
 Pull request [#7](https://github.com/YasayanEfsane/KernelScope/pull/7)
@@ -72,7 +93,8 @@ Checks completed in that environment:
 Hosted compilation is a package-quality gate, not kernel runtime validation.
 A release candidate still requires:
 
-1. Run WDK Code Analysis/PREfast for Drivers with the recorded release toolchain.
+1. Review and disposition every driver-specific CodeQL result; generate and
+   validate a DVL separately if a future release pursues WHCP certification.
 2. Build and sign only in an organization-controlled release environment.
 3. Load the signed package only in a snapshotted isolated VM.
 4. Run `KernelScopeIntegration.exe`, the PowerShell integration workflow, and

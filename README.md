@@ -86,7 +86,7 @@ The project is built around four principles:
 | Integrity checks | Implemented | SHA-256 through CNG and Authenticode through WinTrust |
 | Offline tests | Implemented | Protocol, parser, hashing, JSON, and sequence tracking |
 | VM integration suite | Implemented | Optional negative protocol and driver lifecycle checks |
-| Hosted CI | Implemented | User-mode tests, CodeQL, pinned WDK builds, Universal INF verification |
+| Hosted CI | Implemented | User-mode tests and CodeQL, pinned WDK builds, driver CodeQL, Universal INF verification |
 | Production support | Not claimed | Independent review, signing, and Windows validation are still required |
 
 The exact validation performed for this source delivery is recorded in
@@ -290,8 +290,10 @@ msbuild .\driver\KernelScopeDriver.vcxproj /m `
 
 Hosted GitHub workflows build and test the user-mode targets and compile the
 KMDF driver in Debug and Release with the pinned Microsoft WDK/SDK packages.
-They validate the stamped Release INF and unsigned output, but never install,
-start, sign, or upload the driver binary.
+They validate the stamped Release INF and unsigned output. A separate driver
+CodeQL job captures the x64 Release build, runs pinned Microsoft recommended and
+must-fix suites, publishes recommended SARIF, and blocks must-fix results. Hosted
+jobs never install, start, sign, or upload the driver binary.
 
 ## Driver signing and installation
 
@@ -497,6 +499,11 @@ in [`docs/TESTING.md`](docs/TESTING.md).
 - The WDK job runs `InfVerif /u`, verifies the Release image is unsigned, and
   uploads text evidence only.
 - `codeql.yml` analyzes C and C++ user-mode build targets.
+- `driver-codeql.yml` captures the x64 Release KMDF build with CodeQL CLI
+  2.25.5, `microsoft/windows-drivers` 1.10.0, and its pinned
+  `microsoft/cpp-queries` 0.0.5 dependency.
+- The driver job publishes recommended SARIF, blocks must-fix results, and
+  uploads only SARIF and text evidence.
 - No hosted workflow loads the driver or handles signing secrets.
 
 ## Repository layout
@@ -647,6 +654,8 @@ not convert this educational project into a supported or production-safe driver.
 
 ## Official references
 
+- [Run CodeQL analysis on Windows driver code](https://learn.microsoft.com/windows-hardware/drivers/devtest/static-tools-and-codeql)
+- [Static Driver Verifier support status](https://learn.microsoft.com/windows-hardware/drivers/devtest/static-driver-verifier)
 - [Download the Windows Driver Kit](https://learn.microsoft.com/windows-hardware/drivers/download-the-wdk)
 - [Install the WDK using NuGet](https://learn.microsoft.com/windows-hardware/drivers/install-the-wdk-using-nuget)
 - [Using KMDF with non-PnP drivers](https://learn.microsoft.com/windows-hardware/drivers/wdf/using-kernel-mode-driver-framework-with-non-pnp-drivers)
