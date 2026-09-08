@@ -198,18 +198,19 @@ jobs:
             throw "CodeQL driver query-pack download failed with exit code $LASTEXITCODE."
           }
 
-          $packRoot = Join-Path $env:USERPROFILE ".codeql\packages\microsoft\windows-drivers\$env:DRIVER_QUERY_PACK_VERSION"
-          $recommendedSuite = Join-Path $packRoot 'windows-driver-suites\recommended.qls'
-          $mustFixSuite = Join-Path $packRoot 'windows-driver-suites\mustfix.qls'
-          foreach ($suite in @($recommendedSuite, $mustFixSuite)) {
-            if (-not (Test-Path -LiteralPath $suite -PathType Leaf)) {
-              throw "Required pinned driver query suite was not found: $suite"
+          $recommendedQuery = "microsoft/windows-drivers@${env:DRIVER_QUERY_PACK_VERSION}:windows-driver-suites/recommended.qls"
+          $mustFixQuery = "microsoft/windows-drivers@${env:DRIVER_QUERY_PACK_VERSION}:windows-driver-suites/mustfix.qls"
+          foreach ($query in @($recommendedQuery, $mustFixQuery)) {
+            & $codeql resolve queries $query 2>&1 | Tee-Object -FilePath $installLog -Append
+            if ($LASTEXITCODE -ne 0) {
+              throw "Pinned driver query suite could not be resolved: $query"
             }
-            "VerifiedSuite=$suite" | Add-Content -LiteralPath $installLog
+            "VerifiedQuery=$query" | Add-Content -LiteralPath $installLog
           }
 
           "CODEQL_EXE=$codeql" | Add-Content -LiteralPath $env:GITHUB_ENV
-          "DRIVER_QUERY_PACK_ROOT=$packRoot" | Add-Content -LiteralPath $env:GITHUB_ENV
+          "RECOMMENDED_QUERY=$recommendedQuery" | Add-Content -LiteralPath $env:GITHUB_ENV
+          "MUSTFIX_QUERY=$mustFixQuery" | Add-Content -LiteralPath $env:GITHUB_ENV
 
       - name: Record analysis environment
         shell: pwsh
@@ -265,8 +266,6 @@ jobs:
           $mustFixSarif = Join-Path $evidenceRoot 'driver-mustfix.sarif'
           $recommendedLog = Join-Path $evidenceRoot 'recommended-analysis.log'
           $mustFixLog = Join-Path $evidenceRoot 'mustfix-analysis.log'
-          $recommendedSuite = Join-Path $env:DRIVER_QUERY_PACK_ROOT 'windows-driver-suites\recommended.qls'
-          $mustFixSuite = Join-Path $env:DRIVER_QUERY_PACK_ROOT 'windows-driver-suites\mustfix.qls'
 
           $commonArguments = @(
             '--format=sarifv2.1.0'
@@ -278,7 +277,7 @@ jobs:
             'database'
             'analyze'
             $env:CODEQL_DATABASE
-            $recommendedSuite
+            $env:RECOMMENDED_QUERY
           ) + $commonArguments + @("--output=$recommendedSarif")
           & $env:CODEQL_EXE @recommendedArguments 2>&1 |
             Tee-Object -FilePath $recommendedLog
@@ -290,7 +289,7 @@ jobs:
             'database'
             'analyze'
             $env:CODEQL_DATABASE
-            $mustFixSuite
+            $env:MUSTFIX_QUERY
           ) + $commonArguments + @("--output=$mustFixSarif")
           & $env:CODEQL_EXE @mustFixArguments 2>&1 |
             Tee-Object -FilePath $mustFixLog
