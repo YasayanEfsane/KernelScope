@@ -71,6 +71,7 @@ jobs:
             "DriverQueryPack=microsoft/windows-drivers@$env:DRIVER_QUERY_PACK_VERSION"
             "MicrosoftCppQueryPack=microsoft/cpp-queries@$env:MICROSOFT_CPP_QUERY_PACK_VERSION"
             "WDKNuGetVersion=$env:WDK_NUGET_VERSION"
+            "SDKNuGetVersion=$env:WDK_NUGET_VERSION"
             'RecommendedSuite=windows-driver-suites/recommended.qls'
             'MustFixSuite=windows-driver-suites/mustfix.qls'
           ) | Set-Content -LiteralPath (Join-Path $evidenceRoot 'environment.txt') -Encoding utf8NoBOM
@@ -143,8 +144,16 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $evidenceRoot = Join-Path $env:GITHUB_WORKSPACE 'artifacts\driver-codeql-evidence'
           $restoreLog = Join-Path $evidenceRoot 'nuget-restore.log'
+          $analysisRoot = Join-Path $env:RUNNER_TEMP 'kernelscope-driver-source'
+          $packageRoot = Join-Path $env:RUNNER_TEMP 'kernelscope-wdk-packages'
 
-          & nuget restore .\packages.config -PackagesDirectory .\packages -NonInteractive -Verbosity normal 2>&1 |
+          New-Item -ItemType Directory -Path $analysisRoot -Force | Out-Null
+          New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
+          Copy-Item -LiteralPath '.\driver' -Destination $analysisRoot -Recurse
+          Copy-Item -LiteralPath '.\shared' -Destination $analysisRoot -Recurse
+          Copy-Item -LiteralPath '.\Directory.Build.props' -Destination $analysisRoot
+
+          & nuget restore .\packages.config -PackagesDirectory $packageRoot -NonInteractive -Verbosity normal 2>&1 |
             Tee-Object -FilePath $restoreLog
           if ($LASTEXITCODE -ne 0) {
             throw "NuGet restore failed with exit code $LASTEXITCODE."
@@ -152,9 +161,9 @@ jobs:
 
           $version = $env:WDK_NUGET_VERSION
           $expectedFiles = @(
-            ".\packages\Microsoft.Windows.WDK.x64.$version\build\native\Microsoft.Windows.WDK.x64.props"
-            ".\packages\Microsoft.Windows.SDK.CPP.x64.$version\build\native\Microsoft.Windows.SDK.cpp.x64.props"
-            ".\packages\Microsoft.Windows.SDK.CPP.$version\build\native\Microsoft.Windows.SDK.cpp.props"
+            (Join-Path $packageRoot "Microsoft.Windows.WDK.x64.$version\build\native\Microsoft.Windows.WDK.x64.props")
+            (Join-Path $packageRoot "Microsoft.Windows.SDK.CPP.x64.$version\build\native\Microsoft.Windows.SDK.cpp.x64.props")
+            (Join-Path $packageRoot "Microsoft.Windows.SDK.CPP.$version\build\native\Microsoft.Windows.SDK.cpp.props")
           )
           foreach ($file in $expectedFiles) {
             if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
@@ -162,6 +171,22 @@ jobs:
             }
             "Verified=$file" | Add-Content -LiteralPath $restoreLog
           }
+
+          $analysisPropsPath = Join-Path $analysisRoot 'Directory.Build.props'
+          [xml]$analysisProps = Get-Content -LiteralPath $analysisPropsPath -Raw
+          $firstProperty = $analysisProps.Project.FirstChild
+          foreach ($importPath in $expectedFiles) {
+            $import = $analysisProps.CreateElement('Import')
+            $import.SetAttribute('Project', $importPath)
+            [void]$analysisProps.Project.InsertBefore($import, $firstProperty)
+          }
+          $analysisProps.Save($analysisPropsPath)
+
+          @(
+            "AnalysisSourceRoot=$analysisRoot"
+            "WDKPackageRoot=$packageRoot"
+          ) | Add-Content -LiteralPath (Join-Path $evidenceRoot 'environment.txt') -Encoding utf8NoBOM
+          "ANALYSIS_SOURCE_ROOT=$analysisRoot" | Add-Content -LiteralPath $env:GITHUB_ENV
 
       - name: Install pinned CodeQL CLI and driver queries
         shell: pwsh
@@ -246,13 +271,14 @@ jobs:
           $evidenceRoot = Join-Path $env:GITHUB_WORKSPACE 'artifacts\driver-codeql-evidence'
           $databaseRoot = Join-Path $env:RUNNER_TEMP 'kernelscope-driver-codeql-db'
           $buildLog = Join-Path $evidenceRoot 'database-create.log'
-          $buildCommand = 'msbuild .\driver\KernelScopeDriver.vcxproj /m /t:Rebuild /nologo /verbosity:minimal /p:Configuration=Release /p:Platform=x64 /p:UsePinnedWdkNuGet=true /p:TargetPlatformVersion=10.0.26100.0 /p:WindowsTargetPlatformVersion=10.0.26100.0 /p:SignMode=Off /p:EnableInf2cat=false'
+          $projectPath = Join-Path $env:ANALYSIS_SOURCE_ROOT 'driver\KernelScopeDriver.vcxproj'
+          $buildCommand = "msbuild `"$projectPath`" /m /t:Rebuild /nologo /verbosity:minimal /p:Configuration=Release /p:Platform=x64 /p:TargetPlatformVersion=10.0.26100.0 /p:WindowsTargetPlatformVersion=10.0.26100.0 /p:SignMode=Off /p:EnableInf2cat=false"
           $arguments = @(
             'database'
             'create'
             $databaseRoot
             '--language=cpp'
-            "--source-root=$env:GITHUB_WORKSPACE"
+            "--source-root=$env:ANALYSIS_SOURCE_ROOT"
             "--command=$buildCommand"
             '--threads=0'
             '--overwrite'
